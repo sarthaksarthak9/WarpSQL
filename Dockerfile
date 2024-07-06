@@ -75,7 +75,7 @@ RUN set -ex \
 
 
 # Update to shared_preload_libraries
-RUN echo "shared_preload_libraries = 'citus,timescaledb,pg_cron,pgautofailover'" >> /usr/local/share/postgresql/postgresql.conf.sample
+RUN echo "shared_preload_libraries = 'timescaledb,pg_cron'" >> /usr/local/share/postgresql/postgresql.conf.sample
 # Adding PG Vector
 
 RUN cd /tmp
@@ -202,192 +202,33 @@ RUN set -eux \
     && rm -rf /usr/src/postgis \
     && apk del .fetch-deps .build-deps 
 
-## Adding Citus
-
-ARG CITUS_VERSION
-# Install Citus dependencies 
-RUN set -ex \
-    && apk add --no-cache --virtual .citus-deps \
-    curl \
-    jq \
-# Install Citus
-    && apk add --no-cache --virtual .citus-build-deps \
-        gcc \
-        libc-dev \
-        make \
-        curl-dev \
-        lz4-dev \
-        zstd-dev \
-        clang15 \
-        krb5-dev \
-        icu-dev \
-        libxslt-dev \
-        libxml2-dev \
-        llvm15-dev \
-    && CITUS_DOWNLOAD_URL="https://github.com/citusdata/citus/archive/refs/tags/v${CITUS_VERSION}.tar.gz" \
-    && curl -L -o /tmp/citus.tar.gz "${CITUS_DOWNLOAD_URL}" \
-    && tar -C /tmp -xvf /tmp/citus.tar.gz \
-    && chown -R postgres:postgres /tmp/citus-${CITUS_VERSION} \
-    && cd /tmp/citus-${CITUS_VERSION} \
-    && PATH="/usr/local/pgsql/bin:$PATH" ./configure \
-    && make \
-    && make install \
-    && cd ~ \
-    && rm -rf /tmp/citus.tar.gz /tmp/citus-${CITUS_VERSION} \
-    && apk del .citus-deps .citus-build-deps
-
-
-
-## Adding pg_repack
-ARG PG_REPACK_VERSION
-RUN set -eux \
-    && apk add --no-cache --virtual .pg_repack-build-deps \
-        openssl-dev \
-        zstd-dev \
-        lz4-dev \
-        zlib-dev \ 
-        make \
-        clang15 \
-        gawk \
-        llvm15 \
-        gcc \
-        musl-dev \
-# build pg_repack
-    && wget  -O /tmp/pg_repack-${PG_REPACK_VERSION}.zip "https://api.pgxn.org/dist/pg_repack/${PG_REPACK_VERSION}/pg_repack-${PG_REPACK_VERSION}.zip" \
-    && unzip  /tmp/pg_repack-${PG_REPACK_VERSION}.zip -d /tmp \
-    && cd /tmp/pg_repack-${PG_REPACK_VERSION} \
-    && make \
-    && make install \
-# clean 
-    && cd / \
-    && rm -rf /tmp/pg_repack-${PG_REPACK_VERSION} /tmp/pg_repack.zip \
-    && apk del .pg_repack-build-deps 
-
-# Adding pgautofailover
-ARG PG_AUTO_FAILOVER_VERSION
-RUN set -eux \
-    && apk add --no-cache --virtual .pg_auto_failover-build-deps \
-        make \ 
-        gcc \
-        musl-dev \
-        krb5-dev \ 
-        openssl-dev \
-        clang15 \ 
-        ncurses-dev \
-        linux-headers \
-        zstd-dev \
-        lz4-dev \
-        zlib-dev \
-        libedit-dev \
-        libxml2-utils \
-        libxslt-dev \
-        llvm15 \
-# build pg_auto_failover
-    && wget  -O /tmp/pg_auto_failover-${PG_AUTO_FAILOVER_VERSION}.zip "https://github.com/hapostgres/pg_auto_failover/archive/refs/tags/v${PG_AUTO_FAILOVER_VERSION}.zip" \
-    && unzip  /tmp/pg_auto_failover-${PG_AUTO_FAILOVER_VERSION}.zip -d /tmp \
-    && ls -alh /tmp \
-    && cd /tmp/pg_auto_failover-${PG_AUTO_FAILOVER_VERSION} \
-    && make \
-    && make install \
-# clean 
-    && cd / \
-    && rm -rf /tmp/pg_auto_failove-${PG_AUTO_FAILOVER_VERSION} /tmp/pg_auto_failove-${PG_AUTO_FAILOVER_VERSION}.zip \
-    && apk del .pg_auto_failover-build-deps
-
-## Adding postgresql-hll
-ARG POSTGRES_HLL_VERSION
-RUN set -eux \
-    && apk add --no-cache --virtual .postgresql-hll-build-deps \
-        openssl-dev \
-        zstd-dev \
-        lz4-dev \
-        zlib-dev \ 
-        make \
-        git \
-        clang15 \
-        gawk \
-        llvm15 \
-        g++ \
-        musl-dev \
-# build postgresql-hll
-    && wget  -O /tmp/postgresql-hll-${POSTGRES_HLL_VERSION}.zip "https://github.com/citusdata/postgresql-hll/archive/refs/tags/v${POSTGRES_HLL_VERSION}.zip" \
-    && unzip  /tmp/postgresql-hll-${POSTGRES_HLL_VERSION}.zip -d /tmp \
-    && cd /tmp/postgresql-hll-${POSTGRES_HLL_VERSION} \
-    && make \
-    && make install \
-# clean 
-    && cd / \
-    && rm -rf /tmp/postgresql-hll-${POSTGRES_HLL_VERSION} /tmp/postgresql-hll-${POSTGRES_HLL_VERSION}.zip \
-    && apk del .postgresql-hll-build-deps 
-
-# Install pg_jobmon
-ARG PG_JOBMON_VERSION
-RUN set -e \
-    \
-    && apk add --no-cache --virtual .pg_jobmon-deps \
-        ca-certificates \
-        openssl \
-        tar \
-    \
-    && cd /tmp\
-    && wget -O pg_jobmon.tar.gz "https://github.com/omniti-labs/pg_jobmon/archive/v$PG_JOBMON_VERSION.tar.gz" \
-    && mkdir -p /tmp/pg_jobmon \
-    && tar \
-        --extract \
-        --file pg_jobmon.tar.gz \
-        --directory /tmp/pg_jobmon \
-        --strip-components 1 \
-    \
-    && apk add --no-cache --virtual .pg_jobmon-build-deps \
-        autoconf \
-        automake \
-        g++ \
-        clang15 \
-        llvm15 \
-        libtool \
-        libxml2-dev \
-        make \
-        perl \
-    && cd /tmp/pg_jobmon \
-    && ls -alh . \
-    && make \
-    && make install \
-    && cd / \
-    && apk del .pg_jobmon-deps .pg_jobmon-build-deps \
-    && rm -rf /tmp/pg_jobmon \
-    && rm /tmp/pg_jobmon.tar.gz 
-
-# Adding pg_partman 
-ARG PG_PARTMAN_VERSION
-
-RUN set -e \
-    && cd /tmp\
-    && apk add --no-cache --virtual .pg_partman-deps \
-    ca-certificates \
-    openssl \
-    tar \
-    && apk add --no-cache --virtual .pg_partman-build-deps \
-    autoconf \
-    automake \
-    g++ \
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+ARG ZOMBODB_VERSION
+ARG PG_VERSION
+# RUN echo ${PG_VERSION} && exit 1
+RUN apk add --no-cache --virtual .zombodb-build-deps \
+    git \
+	curl \
+	bash \
+	ruby-dev \
+	ruby-etc \
+	musl-dev \
+	make \
+	gcc \
+	coreutils \
+	util-linux-dev \
+	musl-dev \
+	openssl-dev \
     clang15 \
-    llvm15 \
-    libtool \   
-    libxml2-dev \
-    make \
-    perl \
-    && wget -O pg_partman.tar.gz "https://github.com/pgpartman/pg_partman/archive/v$PG_PARTMAN_VERSION.tar.gz" \
-    && mkdir -p /tmp/pg_partman \
-    && tar \
-        --extract \
-        --file pg_partman.tar.gz \
-        --directory /tmp/pg_partman \
-        --strip-components 1 \
-    && cd /tmp/pg_partman \
-    && make \
-    && make install \
-    # clean
-    && cd / \
-    && rm /tmp/pg_partman.tar.gz \
-    && rm -rf /tmp/pg_partman \
-    && apk del .pg_partman-deps .pg_partman-build-deps 
+	tar \
+    && gem install --no-document fpm \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y \
+    && PATH=$HOME/.cargo/bin:$PATH \
+    && cargo install cargo-pgrx --version 0.9.3 \
+    && cargo pgrx init --pg${PG_VERSION}=$(which pg_config) \
+    && git clone --depth 1 --branch ${ZOMBODB_VERSION} https://github.com/zombodb/zombodb.git \
+    && cd ./zombodb \
+    && cargo pgrx install --release \
+    && cd .. \
+    && rm -rf ./zombodb \
+    && apk del .zombodb-build-deps
