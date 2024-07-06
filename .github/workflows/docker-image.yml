@@ -1,4 +1,5 @@
 name: Tagged Release Docker Image
+
 on:
   workflow_dispatch:
     inputs:
@@ -6,22 +7,23 @@ on:
         description: 'Version to release'
         required: true
       ORG:
-          description: 'the organization for tagging Docker images'
-          required: true
-          default: "samagragovernance"
+        description: 'the organization for tagging Docker images'
+        required: true
+        default: "samagragovernance"
       tag_latest:
-            description: 'Tag the published images as latest'
-            type: boolean
-            required: false
-            default: false
+        description: 'Tag the published images as latest'
+        type: boolean
+        required: false
+        default: false
       ts_version:
         description: 'TS version to be used'
         required: false
         default: ""
+
 env:
-  ORG: ${{inputs.ORG}}
-  TS_VERSION: ${{inputs.ts_version}}
-  PRE_RELEASE: "true" # prevents the latest tag from being pushed.
+  ORG: ${{ inputs.ORG }}
+  TS_VERSION: ${{ inputs.ts_version }}
+
 jobs:
 
   # Build multi-arch TimescaleDB images for both TSL and OSS code.
@@ -37,33 +39,25 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-            ref: ${{inputs.version}}
+          ref: ${{ inputs.version }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
           platforms: all
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-
-      - name: Login to DockerHub Registry
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USER }} --password-stdin
-
       - name: Build and push multi-platform Docker image for postgres
         run: |
-            if [ "${{inputs.tag_latest}}" == "true" ]; then
-              export PRE_RELEASE=''
-            fi
-            make multi${{ matrix.oss }} ORG="$ORG" PG_VER="pg${{ matrix.pg }}" \
-            ${TS_VERSION:+TS_VERSION="$TS_VERSION"}  PREV_EXTRA="${{ matrix.oss }}" PRE_RELEASE="$PRE_RELEASE"
- # Build bitnami images of TimscaleDB.
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USER }} --password-stdin
+          if [ "${{ inputs.tag_latest}}" == "true" ]; then
+            export PRE_RELEASE=''
+          fi
+          make multi${{ matrix.oss }} ORG="$ORG" PG_VER="pg${{ matrix.pg }}" \
+            ${TS_VERSION:+TS_VERSION="$TS_VERSION"} PREV_EXTRA="${{ matrix.oss }}" PRE_RELEASE="$PRE_RELEASE"
+
+  # Build bitnami images of TimscaleDB.
   # The images are built only for amd64, since it is the only supported architecture in the base image bitname/postgresql.
-  # The images are only built for TSL code.
+  # The images are only built for TSL code.  
   timescaledb-bitnami:
 
     name: PG${{ matrix.pg }}-bitnami
@@ -76,15 +70,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-            ref: ${{inputs.version}}
-
-      - name: Login to DockerHub Registry
-        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USER }} --password-stdin
+          ref: ${{ inputs.version }}
 
       - name: Build and push amd64 Docker image for TimescaleDB bitnami
         run: |
-          if [ "${{inputs.tag_latest}}" == "true" ]; then
+          echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USER }} --password-stdin
+          if [ "${{ inputs.tag_latest}}" == "true" ]; then
             export PRE_RELEASE=''
           fi
-          make push ORG="$ORG" PG_VER="pg${{ matrix.pg }}" ${TS_VERSION:+TS_VERSION="$TS_VERSION"}  PRE_RELEASE="$PRE_RELEASE"
-        working-directory: bitnami
+          make push ORG="$ORG" PG_VER="pg${{ matrix.pg }}" ${TS_VERSION:+TS_VERSION="$TS_VERSION"} PRE_RELEASE="$PRE_RELEASE"
+          working-directory: bitnami
+
+
